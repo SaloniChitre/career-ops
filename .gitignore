@@ -1,0 +1,11 @@
+# Sensitive files
+auth/credentials.json
+auth/token.pickle
+.env
+
+# Data and logs
+data/jobs_log.json
+
+# System files
+__pycache__/
+.DS_Store
