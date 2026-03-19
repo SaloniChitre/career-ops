@@ -1,11 +1,27 @@
-# Sensitive files
-auth/credentials.json
-auth/token.pickle
+# --- SECURITY: PRIVATE KEYS & TORENS ---
 .env
+token.json
+credentials.json
 
-# Data and logs
+# --- PERSONAL DATA (Your Job Logs) ---
+data/*.json
+data/*.docx
 data/jobs_log.json
 
-# System files
+# --- PYTHON ENVIRONMENT ---
+venv/
+env/
 __pycache__/
+*.pyc
+
+# --- OS SPECIFIC FILES ---
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+auth/token.pickle
+auth/*.pickle
+auth/*.json
