@@ -40,7 +40,8 @@ def sync_jobs(hours: int = 24, output_file: str = None, save_log: bool = True):
     """
     print("=" * 60)
     print("🚀 Career Ops Manager — Sync Jobs")
-    print(f"   Scanning LinkedIn Job Alerts from last {hours} hour(s)")
+    days = hours // 24
+    print(f"   Scanning last {days} day(s) ({hours} hours) of emails")
     print("=" * 60)
 
     # Step 1: Fetch emails
@@ -52,7 +53,7 @@ def sync_jobs(hours: int = 24, output_file: str = None, save_log: bool = True):
     # Step 2: Extract job listings from emails
     all_jobs = []
     for alert in alerts:
-        jobs = extract_job_listings(alert["body"])
+        jobs = extract_job_listings(alert["body"], email_status=alert.get("status", "ALERT"), email_subject=alert.get("subject", ""))
         all_jobs.extend(jobs)
 
     if not all_jobs:
@@ -96,7 +97,7 @@ def sync_jobs(hours: int = 24, output_file: str = None, save_log: bool = True):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Career Ops Manager — Sync LinkedIn Job Alerts")
-    parser.add_argument("--hours", type=int, default=24, help="How many hours back to search (default: 24)")
+    parser.add_argument("--hours", type=int, default=2160, help="How many hours back to search (default: 2160 = 90 days)")
     parser.add_argument("--output", type=str, default=None, help="Save dashboard to a markdown file")
     parser.add_argument("--no-log", action="store_true", help="Don't save results to jobs log")
     args = parser.parse_args()

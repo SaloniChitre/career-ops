@@ -48,7 +48,7 @@ def get_gmail_service():
                     "Please download it from Google Cloud Console and place it in the auth/ folder."
                 )
             flow = InstalledAppFlow.from_client_secrets_file(str(CREDENTIALS_PATH), SCOPES)
-            creds = flow.run_local_server(port=0)
+            creds = flow.run_local_server(port=3000)
 
         # Save token for next run
         with open(TOKEN_PATH, "wb") as token_file:

@@ -3,10 +3,8 @@ import json
 import pandas as pd
 from pathlib import Path
 
-# Page Config
 st.set_page_config(page_title="Saloni's Career Ops", page_icon="💼", layout="wide")
 
-# Path to your data
 LOG_PATH = Path("data/jobs_log.json")
 
 def load_data():
@@ -15,7 +13,6 @@ def load_data():
     with open(LOG_PATH, "r") as f:
         return json.load(f)
 
-# Sidebar Info
 st.sidebar.title("🚀 Career Ops Manager")
 if st.sidebar.button("Refresh Data"):
     st.rerun()
@@ -26,46 +23,70 @@ if not data:
     st.warning("No data found. Run `python3 sync_jobs.py` first!")
 else:
     st.title("🗂️ Job Application Tracker")
-    
-    # 1. Create Tabs for different statuses
-    tab_titles = ["Accepted 🏆", "In Progress 👀", "Applied ✅", "Alerts 🔔", "Rejected ❌"]
-    t1, t2, t3, t4, t5 = st.tabs(tab_titles)
 
-    # Map internal status to tabs
-    mapping = {
-        "ACCEPTED": t1,
-        "IN_PROGRESS": t2,
-        "APPLIED": t3,
-        "ALERT": t4,
-        "REJECTED": t5
+    # Tab definitions — APPLIED and IN_PROGRESS both appear in "In Progress"
+    tab_titles = ["Accepted 🏆", "In Progress 👀", "Alerts 🔔", "Rejected ❌"]
+    t_accepted, t_inprogress, t_alerts, t_rejected = st.tabs(tab_titles)
+
+    TAB_STATUS_MAP = {
+        t_accepted:   ["ACCEPTED"],
+        t_inprogress: ["IN_PROGRESS", "APPLIED"],
+        t_alerts:     ["ALERT"],
+        t_rejected:   ["REJECTED"],
     }
 
-    for status_key, tab_obj in mapping.items():
+    CATEGORY_ORDER = [
+        "Data Science / ML",
+        "Data Analytics",
+        "Data Engineering",
+        "Software Engineering",
+        "Product Management",
+        "Consulting",
+        "Marketing",
+        "Other"
+    ]
+
+    for tab_obj, statuses in TAB_STATUS_MAP.items():
         with tab_obj:
-            filtered_jobs = [j for j in data if j.get("status") == status_key]
-            
+            filtered_jobs = [j for j in data if j.get("status") in statuses]
+
             if not filtered_jobs:
-                st.info(f"No jobs currently in {status_key.lower()} status.")
+                st.info("No jobs in this category yet.")
                 continue
 
-            # Display a clean table for each status
-            df = pd.DataFrame(filtered_jobs)
-            # Reorder columns for readability
-            cols = ["match_score", "title", "company", "verdict"]
-            st.dataframe(df[cols], use_container_width=True, hide_index=True)
+            # Show a sub-label in In Progress so user knows which are Applied vs In Progress
+            if statuses == ["IN_PROGRESS", "APPLIED"]:
+                applied = [j for j in filtered_jobs if j.get("status") == "APPLIED"]
+                in_prog  = [j for j in filtered_jobs if j.get("status") == "IN_PROGRESS"]
+                if applied:
+                    st.caption(f"✅ Applied: {len(applied)}  |  👀 Actively In Progress: {len(in_prog)}")
 
-            # Detailed Breakdown Section
-            with st.expander("🔍 View Detailed AI Insights"):
-                for job in filtered_jobs:
-                    st.subheader(f"{job['title']} @ {job['company']}")
-                    col_a, col_b = st.columns(2)
-                    with col_a:
-                        st.write("**✅ Top Matches:**")
-                        st.write(", ".join(job.get("top_matches", [])))
-                    with col_b:
-                        st.write("**⚠️ Gaps:**")
-                        st.write(", ".join(job.get("gaps", [])))
-                    
-                    if job.get("recruiter_message"):
-                        st.info(f"**📨 Recruiter Outreach:**\n\n{job['recruiter_message']}")
-                    st.divider()
+            # Group by category
+            grouped = {}
+            for job in filtered_jobs:
+                cat = job.get("category", "Other")
+                grouped.setdefault(cat, []).append(job)
+
+            for cat in CATEGORY_ORDER:
+                if cat not in grouped:
+                    continue
+                jobs_in_cat = grouped[cat]
+                st.subheader(f"📂 {cat} ({len(jobs_in_cat)})")
+
+                df = pd.DataFrame(jobs_in_cat)
+                display_cols = [c for c in ["status", "match_score", "title", "company", "verdict"] if c in df.columns]
+                st.dataframe(df[display_cols], use_container_width=True, hide_index=True)
+
+                with st.expander("🔍 View Detailed AI Insights"):
+                    for job in jobs_in_cat:
+                        st.subheader(f"{job['title']} @ {job['company']}")
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            st.write("**✅ Top Matches:**")
+                            st.write(", ".join(job.get("top_matches", [])) or "—")
+                        with col_b:
+                            st.write("**⚠️ Gaps:**")
+                            st.write(", ".join(job.get("gaps", [])) or "—")
+                        if job.get("recruiter_message"):
+                            st.info(f"**📨 Recruiter Outreach:**\n\n{job['recruiter_message']}")
+                        st.divider()
