@@ -20,7 +20,7 @@ def render_dashboard(scored_jobs: list[dict], sync_time: str = None) -> str:
         sync_time = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     lines = [
-        f"# 🗂️ Saloni's Career Ops Dashboard",
+        f"# 🗂️ Deepam's Career Ops Dashboard",
         f"**Last Synced:** {sync_time}  |  **Records Found:** {len(scored_jobs)}",
         "",
         "---",
@@ -37,8 +37,8 @@ def render_dashboard(scored_jobs: list[dict], sync_time: str = None) -> str:
     ]
 
     for section_title, status_key in status_order:
-        # Filter jobs for this specific category
-        category_jobs = [j for j in scored_jobs if j.get("status") == status_key]
+        # Filter jobs for this specific category (Case-insensitive check)
+        category_jobs = [j for j in scored_jobs if str(j.get("status", "")).upper() == status_key]
         
         if not category_jobs:
             continue
@@ -61,10 +61,8 @@ def render_dashboard(scored_jobs: list[dict], sync_time: str = None) -> str:
         
         lines.append("")
 
-        # Add detailed breakdowns for high-interest categories
         if status_key in ["ALERT", "IN_PROGRESS", "ACCEPTED"]:
             for job in category_jobs:
-                # Only show details for jobs that have a high match score or are in progress
                 if job.get("match_score", 0) >= 70 or status_key != "ALERT":
                     lines.extend(_render_job_detail(job))
         
@@ -105,27 +103,46 @@ def save_to_log(scored_jobs: list[dict]):
     Appends scored jobs to a persistent JSON log file.
     Avoids duplicates by job title + company + status.
     """
-    existing = []
+    raw_data = []
     if LOG_PATH.exists():
         with open(LOG_PATH) as f:
             try:
-                existing = json.load(f)
+                raw_data = json.load(f)
             except json.JSONDecodeError:
-                existing = []
+                raw_data = []
 
-    # Include 'status' in the key so moving from 'Applied' to 'Rejected' updates the log
-    existing_keys = {(j.get("title"), j.get("company"), j.get("status")) for j in existing}
+    # FIX: Extract the list of jobs regardless of whether the file is a List or Dict
+    if isinstance(raw_data, dict) and 'jobs' in raw_data:
+        existing_jobs = raw_data['jobs']
+    else:
+        existing_jobs = raw_data if isinstance(raw_data, list) else []
+
+    # FIX: Ensure we only run .get() on actual dictionaries to avoid AttributeError
+    existing_keys = {
+        (j.get("title"), j.get("company"), str(j.get("status", "")).upper()) 
+        for j in existing_jobs 
+        if isinstance(j, dict)
+    }
     
-    new_jobs = [
-        j for j in scored_jobs 
-        if (j.get("title"), j.get("company"), j.get("status")) not in existing_keys
-    ]
+    new_entries = []
+    for j in scored_jobs:
+        # Standardize the incoming status to uppercase
+        j_status = str(j.get("status", "ALERT")).upper()
+        j["status"] = j_status 
+        
+        key = (j.get("title"), j.get("company"), j_status)
+        if key not in existing_keys:
+            new_entries.append(j)
 
-    if new_jobs:
-        existing.extend(new_jobs)
+    if new_entries:
+        existing_jobs.extend(new_entries)
+        
+        # Save back in the format the Streamlit app prefers
+        final_output = {"jobs": existing_jobs}
+        
         with open(LOG_PATH, "w") as f:
-            json.dump(existing, f, indent=2)
-        print(f"💾 Saved {len(new_jobs)} new job(s)/updates to log.")
+            json.dump(final_output, f, indent=2)
+        print(f"💾 Saved {len(new_entries)} new job(s)/updates to log.")
     else:
         print("ℹ️ No new jobs or status updates to save.")
 
@@ -136,6 +153,10 @@ def load_log() -> list[dict]:
         return []
     with open(LOG_PATH) as f:
         try:
-            return json.load(f)
+            raw_data = json.load(f)
+            # Standardize output to always return a list
+            if isinstance(raw_data, dict) and 'jobs' in raw_data:
+                return raw_data['jobs']
+            return raw_data if isinstance(raw_data, list) else []
         except json.JSONDecodeError:
             return []
